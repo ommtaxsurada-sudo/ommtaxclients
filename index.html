@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Customer Master</title>
+
+<style>
+body{
+    font-family:Arial;
+    max-width:1200px;
+    margin:30px auto;
+    padding:20px;
+    background:#f5f5f5;
+}
+
+h2{
+    text-align:center;
+}
+
+input,textarea{
+    width:100%;
+    padding:10px;
+    margin:8px 0;
+    font-size:16px;
+    box-sizing:border-box;
+}
+
+button{
+    width:100%;
+    padding:12px;
+    background:#2196F3;
+    color:white;
+    border:none;
+    cursor:pointer;
+    font-size:16px;
+}
+
+button:hover{
+    background:#1976D2;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+    background:white;
+}
+
+table,
+thead th,
+tbody td,
+tfoot td{
+    border:1px solid #ccc;
+}
+
+th{
+    background:#2196F3;
+    color:white;
+}
+
+th,
+td{
+    padding:10px;
+    text-align:left;
+}
+
+tfoot tr{
+    background:#2196F3;
+    color:white;
+    font-weight:bold;
+}
+</style>
+
+</head>
+<body>
+
+<h2>Customer Master Entry</h2>
+
+<input type="text" id="name" placeholder="Customer Name">
+
+<input type="text" id="mobile" placeholder="Mobile Number">
+
+<textarea id="address" placeholder="Address"></textarea>
+
+<button onclick="saveCustomer()">Save Customer</button>
+
+<hr>
+
+<table>
+
+<thead>
+
+<tr>
+    <th>Name</th>
+    <th>Mobile</th>
+    <th>Address</th>
+    <th>Outstanding</th>
+    <th>Action</th>
+</tr>
+
+</thead>
+
+<tbody id="tbody">
+</tbody>
+
+<tfoot>
+
+<tr style="
+    background:#2196F3;
+    color:white;
+    font-weight:bold;
+">
+
+    <td colspan="3"
+        style="
+        text-align:right;
+        border:1px solid #ccc;
+        ">
+        Grand Total Outstanding
+    </td>
+
+    <td id="grandOutstanding"
+        style="
+        border:1px solid #ccc;
+        text-align:center;
+        ">
+        0
+    </td>
+
+    <td
+        style="
+        border:1px solid #ccc;
+        ">
+    </td>
+
+</tr>
+
+</tfoot>
+
+</table>
+
+<script type="module">
+
+
+
+
+
+
+
+    
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  writeBatch
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+let allCustomers = [];
+
+const firebaseConfig = {
+
+  apiKey: "AIzaSyBOw2CG4-8JWYNl5hf3aR7yCPjcPI41IC0",
+  authDomain: "ommtaxsolutions.firebaseapp.com",
+  projectId: "ommtaxsolutions",
+  storageBucket: "ommtaxsolutions.firebasestorage.app",
+  messagingSenderId: "944702919466",
+  appId: "1:944702919466:web:6f37b36e1d5cf6d7a54453",
+  measurementId: "G-NNTHM5Y4B8"
+
+};
+
+const app = initializeApp(firebaseConfig);
+
+const db = getFirestore(app);
+
+window.saveCustomer = async function(){
+
+    let name=document.getElementById("name").value.trim();
+    let mobile=document.getElementById("mobile").value.trim();
+    let address=document.getElementById("address").value.trim();
+
+    if(name==""){
+        alert("Enter Customer Name");
+        return;
+    }
+
+    if(editId){
+
+        await updateDoc(doc(db,"customers",editId),{
+
+            name:name,
+            mobile:mobile,
+            address:address
+
+        });
+
+        alert("Customer Updated Successfully");
+
+        editId=null;
+
+    }else{
+
+       await addDoc(collection(db,"customers"),{
+      name: name,
+      mobile: mobile,
+      address: address,
+      outstanding: 0
+      });
+
+        alert("Customer Saved Successfully");
+
+    }
+
+    document.getElementById("name").value="";
+    document.getElementById("mobile").value="";
+    document.getElementById("address").value="";
+
+    loadCustomers();
+
+}
+
+async function loadCustomers(){
+
+    allCustomers = [];
+
+    let html = "";
+
+    // ----------------------------
+    // Calculate Outstanding
+    // ----------------------------
+
+    let ledger = {};
+
+    // Sales
+    const salesSnap = await getDocs(collection(db,"sales"));
+
+    salesSnap.forEach(doc=>{
+
+        let d = doc.data();
+
+        if(!ledger[d.name]){
+            ledger[d.name] = {
+                sales:0,
+                payment:0
+            };
+        }
+
+        ledger[d.name].sales += Number(d.payment || 0);
+
+    });
+
+    // Payments
+    const paymentSnap = await getDocs(collection(db,"payments"));
+
+    paymentSnap.forEach(doc=>{
+
+        let d = doc.data();
+
+        if(!ledger[d.name]){
+            ledger[d.name] = {
+                sales:0,
+                payment:0
+            };
+        }
+
+        ledger[d.name].payment += Number(d.payment || 0);
+
+    });
+
+    // ----------------------------
+    // Load Customers
+    // ----------------------------
+
+    const querySnapshot = await getDocs(collection(db,"customers"));
+
+    querySnapshot.forEach(document=>{
+
+        let d = document.data();
+
+        allCustomers.push({
+            id:document.id,
+            ...d
+        });
+
+    });
+    let grandOutstanding = 0;
+
+const batch = writeBatch(db);
+
+allCustomers.forEach(c => {
+
+    let sales = ledger[c.name]?.sales || 0;
+    let payment = ledger[c.name]?.payment || 0;
+    let outstanding = sales - payment;
+
+    grandOutstanding += outstanding;
+
+    // Save outstanding into Firestore
+    batch.update(doc(db, "customers", c.id), {
+        outstanding: outstanding
+    });
+
+    html += `
+    <tr>
+
+        <td>${c.name}</td>
+
+        <td>${c.mobile}</td>
+
+        <td>${c.address}</td>
+
+        <td style="
+            color:${outstanding >= 0 ? 'red' : 'green'};
+            font-weight:bold;
+        ">
+            ${outstanding.toLocaleString('en-IN')}
+        </td>
+
+        <td>
+
+            <button onclick="editCustomer('${c.id}')">
+                Edit
+            </button>
+
+            <button
+                onclick="deleteCustomer('${c.id}')"
+                style="background:red;color:white;margin-top:5px;">
+                Delete
+            </button>
+
+        </td>
+
+    </tr>
+    `;
+});
+
+// Update all customer documents
+await batch.commit();
+
+    document.getElementById("tbody").innerHTML = html;
+    document.getElementById("grandOutstanding").innerHTML =
+    grandOutstanding.toLocaleString('en-IN');
+}
+let editId = null;
+
+window.editCustomer = function(id) {
+    let c = allCustomers.find(x => x.id === id);
+
+    if (!c) return;
+
+    document.getElementById("name").value = c.name;
+    document.getElementById("mobile").value = c.mobile;
+    document.getElementById("address").value = c.address;
+
+    editId = id;
+};
+
+window.deleteCustomer=async function(id){
+
+    if(confirm("Delete this customer?")){
+
+        await deleteDoc(doc(db,"customers",id));
+
+        alert("Customer Deleted");
+
+        loadCustomers();
+
+    }
+
+}
+loadCustomers();
+
+</script>
+
+</body>
+</html>
