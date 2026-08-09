@@ -178,6 +178,27 @@ const app = initializeApp(firebaseConfig);
 
 const db = getFirestore(app);
 
+import {
+    getAuth,
+    onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+
+const auth = getAuth(app);
+
+onAuthStateChanged(auth, (user) => {
+
+    if (!user) {
+        window.location.href = "https://ommtaxsurada-sudo.github.io/ommtaxlogin/";
+        return;
+    }
+
+    console.log("Authorized user:", user.uid);
+
+});
+
+
+
+
 window.saveCustomer = async function(){
 
     let name=document.getElementById("name").value.trim();
